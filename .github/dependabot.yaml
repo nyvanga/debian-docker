@@ -1,0 +1,20 @@
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      time: "06:15"
+      timezone: "Europe/Copenhagen"
+    assignees:
+      - "nyvanga"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      time: "06:30"
+      timezone: "Europe/Copenhagen"
+    assignees:
+      - "nyvanga"

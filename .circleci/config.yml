@@ -1,0 +1,95 @@
+version: 2.1
+
+parameters:
+  image:
+    type: string
+    default: "docker"
+
+orbs:
+  multiarch: nanders/multiarch@1.3.1
+
+workflows:
+  build_bookworm:
+    jobs:
+      - multiarch/build_x86_64:
+          context:
+            - docker-hub
+          name: "Bookworm x86_64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-"
+          build_context: "docker/"
+          build_args: "--build-arg BASE_IMAGE=debian:bookworm-slim"
+      - multiarch/build_arm64:
+          context:
+            - docker-hub
+          name: "Bookworm arm64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-"
+          build_context: "docker/"
+          build_args: "--build-arg BASE_IMAGE=debian:bookworm-slim"
+      - multiarch/create_and_push_manifest:
+          context:
+            - docker-hub
+          name: "Bookworm << matrix.tag >> manifest"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-"
+          matrix:
+            parameters:
+              tag:
+                - bookworm
+                - latest
+            alias: "Bookworm manifests"
+          requires:
+            - "Bookworm x86_64"
+            - "Bookworm arm64"
+      - multiarch/remove_architecture_tags:
+          context:
+            - docker-hub
+          name: "Bookworm cleanup"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-"
+          requires:
+            - "Bookworm manifests"
+      - multiarch/build_x86_64:
+          context:
+            - docker-hub
+          name: "Bookworm OpenJDK 17 x86_64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-17-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bookworm --build-arg OPENJDK_VERSION=17"
+          requires:
+            - "Bookworm cleanup"
+      - multiarch/build_arm64:
+          context:
+            - docker-hub
+          name: "Bookworm OpenJDK 17 arm64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-17-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bookworm --build-arg OPENJDK_VERSION=17"
+          requires:
+            - "Bookworm cleanup"
+      - multiarch/create_and_push_manifest:
+          context:
+            - docker-hub
+          name: "Bookworm OpenJDK 17 << matrix.tag >> manifest"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-17-"
+          matrix:
+            parameters:
+              tag:
+                - bookworm-openjdk-17
+                - openjdk-17
+            alias: "Bookworm OpenJDK 17 manifests"
+          requires:
+            - "Bookworm OpenJDK 17 x86_64"
+            - "Bookworm OpenJDK 17 arm64"
+      - multiarch/remove_architecture_tags:
+          context:
+            - docker-hub
+          name: "Bookworm OpenJDK 17 cleanup"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-17-"
+          requires:
+            - "Bookworm OpenJDK 17 manifests"
