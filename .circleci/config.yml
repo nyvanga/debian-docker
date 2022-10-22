@@ -1,37 +1,152 @@
 version: 2.1
 
-jobs:
-  move-along:
-    docker:
-      - image: cimg/base:stable
-    steps:
-      - run:
-          name: "It's ok"
-          command: |
-            echo "#######"
-            echo "#        #    #  ######  #####    #   #   #####  #    #     #    #    #   ####"
-            echo "#        #    #  #       #    #    # #      #    #    #     #    ##   #  #    #"
-            echo "#####    #    #  #####   #    #     #       #    ######     #    # #  #  #"
-            echo "#        #    #  #       #####      #       #    #    #     #    #  # #  #  ###"
-            echo "#         #  #   #       #   #      #       #    #    #     #    #   ##  #    #"
-            echo "#######    ##    ######  #    #     #       #    #    #     #    #    #   ####"
-            echo
-            echo "    #     ####"
-            echo "    #    #"
-            echo "    #     ####"
-            echo "    #         #"
-            echo "    #    #    #"
-            echo "    #     ####"
-            echo
-            echo "                  ###"
-            echo "  ####   #    #   ###"
-            echo " #    #  #   #    ###"
-            echo " #    #  ####      #"
-            echo " #    #  #  #"
-            echo " #    #  #   #    ###"
-            echo "  ####   #    #   ###"
+parameters:
+  image:
+    type: string
+    default: "test-circleci-docker"
+
+orbs:
+  multiarch: nanders/multiarch@1.0.5
 
 workflows:
-  nothing-to-see-here:
+  build_bullseye:
     jobs:
-      - move-along
+      - multiarch/build_x86_64:
+          name: "Bullseye x86_64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bullseye-"
+          build_context: "docker/"
+          build_args: "--build-arg BASE_IMAGE=debian:bullseye-slim"
+      - multiarch/build_arm64:
+          name: "Bullseye arm64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bullseye-"
+          build_context: "docker/"
+          build_args: "--build-arg BASE_IMAGE=debian:bullseye-slim"
+      - multiarch/create_and_push_manifests:
+          name: "Bullseye manifests"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bullseye-"
+          tags: "bullseye latest"
+          requires:
+            - "Bullseye x86_64"
+            - "Bullseye arm64"
+      - multiarch/build_x86_64:
+          name: "Bullseye OpenJDK 11 x86_64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bullseye-openjdk-11-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bullseye --build-arg OPENJDK_VERSION=11"
+          requires:
+            - "Bullseye manifests"
+      - multiarch/build_arm64:
+          name: "Bullseye OpenJDK 11 arm64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bullseye-openjdk-11-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bullseye --build-arg OPENJDK_VERSION=11"
+          requires:
+            - "Bullseye manifests"
+      - multiarch/create_and_push_manifests:
+          name: "Bullseye OpenJDK 11 manifests"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bullseye-openjdk-11-"
+          tags: "bullseye-openjdk-11 openjdk-11"
+          requires:
+            - "Bullseye OpenJDK 11 x86_64"
+            - "Bullseye OpenJDK 11 arm64"
+      - multiarch/build_x86_64:
+          name: "Bullseye OpenJDK 17 x86_64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bullseye-openjdk-17-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bullseye --build-arg OPENJDK_VERSION=17"
+          requires:
+            - "Bullseye manifests"
+      - multiarch/build_arm64:
+          name: "Bullseye OpenJDK 17 arm64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bullseye-openjdk-17-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bullseye --build-arg OPENJDK_VERSION=17"
+          requires:
+            - "Bullseye manifests"
+      - multiarch/create_and_push_manifests:
+          name: "Bullseye OpenJDK 17 manifests"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bullseye-openjdk-17-"
+          tags: "bullseye-openjdk-17 openjdk-17"
+          requires:
+            - "Bullseye OpenJDK 17 x86_64"
+            - "Bullseye OpenJDK 17 arm64"
+
+  build_bookworm:
+    jobs:
+      - multiarch/build_x86_64:
+          name: "Bookworm x86_64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-"
+          build_context: "docker/"
+          build_args: "--build-arg BASE_IMAGE=debian:bookworm-slim"
+      - multiarch/build_arm64:
+          name: "Bookworm arm64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-"
+          build_context: "docker/"
+          build_args: "--build-arg BASE_IMAGE=debian:bookworm-slim"
+      - multiarch/create_and_push_manifests:
+          name: "Bookworm manifests"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-"
+          tags: "bookworm testing"
+          requires:
+            - "Bookworm x86_64"
+            - "Bookworm arm64"
+      - multiarch/build_x86_64:
+          name: "Bookworm OpenJDK 11 x86_64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-11-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bookworm --build-arg OPENJDK_VERSION=11"
+          requires:
+            - "Bookworm manifests"
+      - multiarch/build_arm64:
+          name: "Bookworm OpenJDK 11 arm64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-11-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bookworm --build-arg OPENJDK_VERSION=11"
+          requires:
+            - "Bookworm manifests"
+      - multiarch/create_and_push_manifests:
+          name: "Bookworm OpenJDK 11 manifests"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-11-"
+          tags: "bookworm-openjdk-11 testing-openjdk-11"
+          requires:
+            - "Bookworm OpenJDK 11 x86_64"
+            - "Bookworm OpenJDK 11 arm64"
+      - multiarch/build_x86_64:
+          name: "Bookworm OpenJDK 17 x86_64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-17-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bookworm --build-arg OPENJDK_VERSION=17"
+          requires:
+            - "Bookworm manifests"
+      - multiarch/build_arm64:
+          name: "Bookworm OpenJDK 17 arm64"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-17-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:bookworm --build-arg OPENJDK_VERSION=17"
+          requires:
+            - "Bookworm manifests"
+      - multiarch/create_and_push_manifests:
+          name: "Bookworm OpenJDK 17 manifests"
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-bookworm-openjdk-17-"
+          tags: "bookworm-openjdk-17 testing-openjdk-17"
+          requires:
+            - "Bookworm OpenJDK 17 x86_64"
+            - "Bookworm OpenJDK 17 arm64"
