@@ -8,9 +8,9 @@ ENV LANG C.UTF-8
 
 WORKDIR /work
 
-COPY certs/ca/docker.crt /usr/local/share/ca-certificates/docker.crt
-COPY certs/localhost.key /usr/local/share/certificates/localhost.key
-COPY certs/localhost.crt /usr/local/share/certificates/localhost.crt
+COPY docker.crt /usr/local/share/ca-certificates/docker.crt
+COPY localhost.key /usr/local/share/certificates/localhost.key
+COPY localhost.crt /usr/local/share/certificates/localhost.crt
 
 COPY docker.gpg /etc/apt/trusted.gpg.d/docker.gpg
 

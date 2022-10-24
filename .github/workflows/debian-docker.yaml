@@ -26,6 +26,10 @@ jobs:
             image_tag: "testing"
     steps:
       - uses: actions/checkout@v3
+      - name: Generate certificates
+        run: |
+          cd docker/
+          ./generate_certs.sh
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v2
       - name: Setup Buildx
