@@ -1,37 +1,153 @@
 version: 2.1
 
+parameters:
+  image:
+    type: string
+    default: "test-circleci-matrix-docker"
+
+orbs:
+  multiarch: nanders/multiarch@1.0.6
+
 jobs:
-  move-along:
-    docker:
-      - image: cimg/base:stable
+  docker-x86_64:
+    parameters:
+      debian:
+        type: string
+    machine:
+      image: ubuntu-2204:current
+    resource_class: medium
     steps:
-      - run:
-          name: "It's ok"
-          command: |
-            echo "#######"
-            echo "#        #    #  ######  #####    #   #   #####  #    #     #    #    #   ####"
-            echo "#        #    #  #       #    #    # #      #    #    #     #    ##   #  #    #"
-            echo "#####    #    #  #####   #    #     #       #    ######     #    # #  #  #"
-            echo "#        #    #  #       #####      #       #    #    #     #    #  # #  #  ###"
-            echo "#         #  #   #       #   #      #       #    #    #     #    #   ##  #    #"
-            echo "#######    ##    ######  #    #     #       #    #    #     #    #    #   ####"
-            echo
-            echo "    #     ####"
-            echo "    #    #"
-            echo "    #     ####"
-            echo "    #         #"
-            echo "    #    #    #"
-            echo "    #     ####"
-            echo
-            echo "                  ###"
-            echo "  ####   #    #   ###"
-            echo " #    #  #   #    ###"
-            echo " #    #  ####      #"
-            echo " #    #  #  #"
-            echo " #    #  #   #    ###"
-            echo "  ####   #    #   ###"
+      - multiarch/docker_hub_login
+      - checkout
+      - multiarch/build_and_push:
+          image: "<< pipeline.parameters.image >>"
+          architecture: "x86_64"
+          tag_prefix: "temp-<< parameters.debian >>-"
+          build_context: "docker/"
+          build_args: "--build-arg BASE_IMAGE=debian:<< parameters.debian >>-slim"
+
+  docker-arm64:
+    parameters:
+      debian:
+        type: string
+    machine:
+      image: ubuntu-2204:current
+    resource_class: arm.medium
+    steps:
+      - multiarch/docker_hub_login
+      - checkout
+      - multiarch/build_and_push:
+          image: "<< pipeline.parameters.image >>"
+          architecture: "arm64"
+          tag_prefix: "temp-<< parameters.debian >>-"
+          build_context: "docker/"
+          build_args: "--build-arg BASE_IMAGE=debian:<< parameters.debian >>-slim"
+
+  docker-manifests:
+    parameters:
+      debian:
+        type: string
+    machine:
+      image: ubuntu-2204:current
+    resource_class: medium
+    steps:
+      - multiarch/docker_hub_login
+      - multiarch/create_and_push_manifests:
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-<< parameters.debian >>-"
+          tags: "<< parameters.debian >>"
+
+  openjdk-x86_64:
+    parameters:
+      debian:
+        type: string
+      openjdk:
+        type: integer
+    machine:
+      image: ubuntu-2204:current
+    resource_class: medium
+    steps:
+      - multiarch/docker_hub_login
+      - checkout
+      - multiarch/build_and_push:
+          image: "<< pipeline.parameters.image >>"
+          architecture: "x86_64"
+          tag_prefix: "temp-<< parameters.debian >>-openjdk-<< parameters.openjdk >>-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:<< parameters.debian >> --build-arg OPENJDK_VERSION=<< parameters.openjdk >>"
+
+  openjdk-arm64:
+    parameters:
+      debian:
+        type: string
+      openjdk:
+        type: integer
+    machine:
+      image: ubuntu-2204:current
+    resource_class: arm.medium
+    steps:
+      - multiarch/docker_hub_login
+      - checkout
+      - multiarch/build_and_push:
+          image: "<< pipeline.parameters.image >>"
+          architecture: "arm64"
+          tag_prefix: "temp-<< parameters.debian >>-openjdk-<< parameters.openjdk >>-"
+          build_context: "docker-openjdk/"
+          build_args: "--build-arg FROM_IMAGE=nyvanga/<< pipeline.parameters.image >>:<< parameters.debian >> --build-arg OPENJDK_VERSION=<< parameters.openjdk >>"
+
+  openjdk-manifests:
+    parameters:
+      debian:
+        type: string
+      openjdk:
+        type: integer
+    machine:
+      image: ubuntu-2204:current
+    resource_class: medium
+    steps:
+      - multiarch/docker_hub_login
+      - multiarch/create_and_push_manifests:
+          image: "<< pipeline.parameters.image >>"
+          tag_prefix: "temp-<< parameters.debian >>-openjdk-<< parameters.openjdk >>-"
+          tags: "<< parameters.debian >>-openjdk-<< parameters.openjdk >>"
 
 workflows:
-  nothing-to-see-here:
+  build_dockers:
     jobs:
-      - move-along
+      - docker-x86_64:
+          matrix:
+            parameters:
+              debian: ["bullseye", "bookworm"]
+      - docker-arm64:
+          matrix:
+            parameters:
+              debian: ["bullseye", "bookworm"]
+      - docker-manifests:
+          matrix:
+            parameters:
+              debian: ["bullseye", "bookworm"]
+          requires:
+            - "docker-x86_64-<< matrix.debian >>"
+            - "docker-arm64-<< matrix.debian >>"
+      - openjdk-x86_64:
+          matrix:
+            parameters:
+              debian: ["bullseye", "bookworm"]
+              openjdk: [11, 17]
+          requires:
+            - "docker-manifests-<< matrix.debian >>"
+      - openjdk-arm64:
+          matrix:
+            parameters:
+              debian: ["bullseye", "bookworm"]
+              openjdk: [11, 17]
+          requires:
+            - "docker-manifests-<< matrix.debian >>"
+      - openjdk-manifests:
+          matrix:
+            parameters:
+              debian: ["bullseye", "bookworm"]
+              openjdk: [11, 17]
+          requires:
+            - "openjdk-x86_64-<< matrix.debian >>-<< matrix.openjdk >>"
+            - "openjdk-arm64-<< matrix.debian >>-<< matrix.openjdk >>"
